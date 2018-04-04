@@ -6394,13 +6394,7 @@ do_pushtag (tree name, tree type, tag_scope scope)
 	    view of the language.  */
 	 || (b->kind == sk_template_parms
 	     && (b->explicit_spec_p || scope == ts_global))
-	 || (b->kind == sk_class
-	     && (scope != ts_current
-		 /* We may be defining a new type in the initializer
-		    of a static member variable. We allow this when
-		    not pedantic, and it is particularly useful for
-		    type punning via an anonymous union.  */
-		 || COMPLETE_TYPE_P (b->this_entity))))
+	 || (b->kind == sk_class && scope != ts_current))
     b = b->level_chain;
 
   gcc_assert (identifier_p (name));
@@ -6455,9 +6449,25 @@ do_pushtag (tree name, tree type, tag_scope scope)
 	{
 	  if (!TYPE_BEING_DEFINED (current_class_type)
 	      && !LAMBDA_TYPE_P (type))
-	    return error_mark_node;
-
-	  if (!PROCESSING_REAL_TEMPLATE_DECL_P ())
+	    {
+	      TYPE_FIELDS (current_class_type)
+		= chainon (TYPE_FIELDS (current_class_type), decl);
+	      if (!ANON_AGGR_TYPE_P (type)
+		  && !PROCESSING_REAL_TEMPLATE_DECL_P ())
+		{
+		  in_class = 0;
+		  /* We may be defining a new type in the initializer
+		     of a static member variable.  We allow this for
+		     __builtin_offsetof, and when not pedantic, and it
+		     is particularly useful for type punning via an
+		     anonymous union.  */
+		  while (b->kind == sk_class
+			 && scope == ts_current
+			 && COMPLETE_TYPE_P (b->this_entity))
+		    b = b->level_chain;
+		}
+	    }
+	  else if (!PROCESSING_REAL_TEMPLATE_DECL_P ())
 	    /* Put this TYPE_DECL on the TYPE_FIELDS list for the
 	       class.  But if it's a member template class, we want
 	       the TEMPLATE_DECL, not the TYPE_DECL, so this is done
